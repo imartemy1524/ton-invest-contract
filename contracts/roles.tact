@@ -1,4 +1,6 @@
-
+message ModeratorCloseTask{
+    taskId: Int as uint64;
+}
 
 
 trait Investable {
@@ -27,9 +29,24 @@ trait Moderable with Investable, Performable, Arguable {
 
     inline fun requireModerator(){
         require(sender() == self.moderator, "Only moderator can call this method");
-        require(self.argueFromInvestor || self.argueFromWorker, "Only moderator can call this method");
+        self.requireArgue();
     }
 
+
+
+
+    // moderator sends rest of the funds to investor
+
+    receive(m: ModeratorCloseTask){
+        self.requireModerator();
+        self.closeTask(m.taskId);
+    }
+    receive("moderator_cancel"){
+        self.requireModerator();
+        self.releaseFundsToInvestor();
+    }
+    abstract fun releaseFundsToInvestor();
+    abstract fun closeTask(taskId: Int);
 }
 
 

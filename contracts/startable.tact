@@ -5,7 +5,6 @@ trait Startable with Performable, Investable{
     canceled: Bool;
     investor: Address;
     performer: Address;
-    subtasks: Subtasks;
 
     //start the contract
     receive("start"){
@@ -16,9 +15,9 @@ trait Startable with Performable, Investable{
     }
     //cancel the contract before it starts
     receive("cancel"){
+        self.requireInvestor();
         self.requireNotStarted();
         self.requireNotCanceled();
-        self.canceled = true;
         self.releaseFundsToInvestor();
     }
     abstract fun releaseFundsToInvestor();

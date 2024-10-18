@@ -13,8 +13,6 @@ message(0xf8a7ea5) TokenTransfer {
 
 trait JettonsSender{
     subtasks: Subtasks;
-
-
     inline fun requireSendFee(){
         require(context().value >= ton("0.13"), "Not enough funds");
     }
@@ -40,12 +38,16 @@ trait JettonsSender{
     }
 
     fun restValue(): Int{
-        let curr = self.subtasks.finsihAmount;
-        foreach(key, task in self.subtasks.tasks){
+        let curr = self.subtasks.finishAmount;
+        let tasks = self.subtasks.tasks;
+        foreach(key, task in tasks){
             if(!task.finished){
                 curr += task.amount;
             }
         }
         return curr;
     }
+
+
+
 }

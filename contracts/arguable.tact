@@ -21,4 +21,8 @@ trait Arguable with Investable, Performable {
         }
     }
 
+    inline fun requireArgue(){
+        require(self.argueFromInvestor || self.argueFromWorker, "No argue");
+    }
+
 }
