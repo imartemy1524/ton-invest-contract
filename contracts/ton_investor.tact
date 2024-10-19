@@ -13,7 +13,7 @@ struct Subtasks{
     finishAmount: Int as coins;
     tasks: map<Int as uint16, OneTask>;
 }
-message IntializeContract{
+message InitializeContract{
     subtasksIT: Subtasks;
 }
 message ReleaseSubtask{
@@ -52,7 +52,7 @@ contract TonInvestor with Moderable, Startable, JettonsSender {
     }
 
     //message to initialize contract
-    receive(m: IntializeContract){
+    receive(m: InitializeContract){
         self.requireNotStarted();
         require(self.subtasks.token == NullAddress, "Already initialized");
         self.requireInvestor();

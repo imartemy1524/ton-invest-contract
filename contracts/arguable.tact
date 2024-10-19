@@ -19,6 +19,7 @@ trait Arguable with Investable, Performable {
         else {
             require(false, "Invalid sender");
         }
+        self.reply("ok".asComment());
     }
 
     inline fun requireArgue(){

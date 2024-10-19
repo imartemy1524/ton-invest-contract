@@ -84,7 +84,7 @@ describe('TonInvestor', () => {
                 value: toNano('0.05'),
             },
             {
-                $$type: 'IntializeContract',
+                $$type: 'InitializeContract',
                 subtasksIT: {
                     $$type: 'Subtasks',
                     token: await tokenMaster.getGetWalletAddress(lockContract.address),
