@@ -1,9 +1,10 @@
 import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { Address, beginCell, Cell, Dictionary, Slice, toNano } from '@ton/core';
-import { OneTask, storeSubtasks, TonInvestor } from '../wrappers/TonInvestor';
+import { OneTask, storeNotifyMessage, storeRandomHasher, storeSubtasks, TonGuarantee } from '../wrappers/TonGuarantee';
 import '@ton/test-utils';
 import { JettonMaster } from '../build/TonJetton/tact_JettonMaster';
 import { JettonChild } from '../build/TonJetton/tact_JettonChild';
+import { Collection } from '../build/TonGuarantee/tact_Collection';
 
 async function deployJetton(blockchain: Blockchain, owner: SandboxContract<TreasuryContract>) {
     let jettonMaster = blockchain.openContract(
@@ -26,7 +27,22 @@ async function deployJetton(blockchain: Blockchain, owner: SandboxContract<Treas
     return jettonMaster;
 }
 
-const interest = (oldAmount: bigint) =>oldAmount/ 50n;
+// function randomId(from: Address, tokenAddress: Address, randomId: bigint) {
+//     const hashBits = beginCell()
+//         .store(
+//             storeRandomHasher({
+//                 from,
+//                 randomId,
+//                 sender: tokenAddress,
+//                 $$type: 'RandomHasher',
+//             }),
+//         )
+//         .asCell()
+//         .hash();
+//     return BigInt('0x' + hashBits.toString('hex'));
+// }
+
+const interest = (oldAmount: bigint) => oldAmount / 50n;
 describe('TonInvestor', () => {
     let blockchain: Blockchain;
     //users
@@ -34,7 +50,7 @@ describe('TonInvestor', () => {
     let performer: SandboxContract<TreasuryContract>;
     let moderator: SandboxContract<TreasuryContract>;
     //lock contract
-    let lockContract: SandboxContract<TonInvestor>;
+    let lockContract: SandboxContract<TonGuarantee>;
     //token contracts
     let tokenMaster: SandboxContract<JettonMaster>;
     let lockToken: SandboxContract<JettonChild>;
@@ -42,28 +58,94 @@ describe('TonInvestor', () => {
     let performerToken: SandboxContract<JettonChild>;
     let moderatorToken: SandboxContract<JettonChild>;
     //tasks
-    let tasks: Dictionary<number, OneTask>;
+    let tasks: Dictionary<number, OneTask> = Dictionary.empty();
     const amountAfterFinish: bigint = toNano('1000');
 
-    const totalTokens = () => tasks
+    const totalTokens = () =>
+        tasks
             .values()
             .map((e) => e.amount)
             .reduce((a, b) => a + b, 0n) + amountAfterFinish;
     beforeEach(async () => {
-        blockchain = await Blockchain.create();
+        //initialize tasks
+        {
+            for (let i = 0; i < 10; i++) {
+                tasks.set(i, {
+                    amount: BigInt(Math.floor(Number(toNano('100')) * Math.random())),
+                    $$type: 'OneTask',
+                    finished: false,
+                });
+            }
+        }
+        //initialize blockchain and users
+        {
+            blockchain = await Blockchain.create();
+            investor = await blockchain.treasury('deployer');
+            performer = await blockchain.treasury('performer');
+            moderator = await blockchain.treasury('moderator');
+            tokenMaster = await deployJetton(blockchain, investor);
+        }
 
-        investor = await blockchain.treasury('deployer');
-        performer = await blockchain.treasury('performer');
-        moderator = await blockchain.treasury('moderator');
+        const collection = blockchain.openContract(await Collection.fromInit());
+
+        await collection.send(
+            moderator.getSender(),
+            {
+                value: toNano('0.1'),
+            },
+            'deploy',
+        );
+        const collectionJetton = blockchain.openContract(
+            JettonChild.fromAddress(await tokenMaster.getGetWalletAddress(collection.address)),
+        );
+        const randomID = BigInt(Math.floor(Math.random() * 10000000000));
 
         lockContract = blockchain.openContract(
-            await TonInvestor.fromInit(investor.address, performer.address, moderator.address),
+            await TonGuarantee.fromInit(
+                collection.address,
+                await collection.getRandomIdFor(collectionJetton.address,investor.address, randomID),
+            ),
         );
+        //TODO: add check for checking if lock contract is already deployed
 
-        tokenMaster = await deployJetton(blockchain, investor);
         investorToken = blockchain.openContract(
             JettonChild.fromAddress(await tokenMaster.getGetWalletAddress(investor.address)),
         );
+        const { transactions } = await investorToken.send(
+            investor.getSender(),
+            {
+                value: toNano('0.3'),
+            },
+            {
+                $$type: 'TokenTransfer',
+                queryId: 0n,
+                amount: totalTokens(),
+                destination: collection.address,
+                response_destination: investor.address,
+                custom_payload: null,
+                forward_ton_amount: toNano('0.2'),
+                forward_payload: beginCell()
+                    .storeRef(
+                        beginCell().store(
+                            storeNotifyMessage({
+                                $$type: 'NotifyMessage',
+                                randomId: randomID,
+                                subtasks: {
+                                    $$type: 'Subtasks',
+                                    token: await tokenMaster.getGetWalletAddress(lockContract.address),
+                                    finishAmount: amountAfterFinish,
+                                    tasks,
+                                },
+                                moderator: moderator.address,
+                                performer: performer.address,
+                            }),
+                        ),
+                    )
+                    .endCell()
+                    .asSlice(),
+            },
+        );
+        printTransactionFees(transactions);
         performerToken = blockchain.openContract(
             JettonChild.fromAddress(await tokenMaster.getGetWalletAddress(performer.address)),
         );
@@ -73,77 +155,16 @@ describe('TonInvestor', () => {
         lockToken = blockchain.openContract(
             JettonChild.fromAddress(await tokenMaster.getGetWalletAddress(lockContract.address)),
         );
-
-        tasks = Dictionary.empty();
-        for (let i = 0; i < 10; i++) {
-            tasks.set(i, {
-                amount: BigInt(Math.floor(Number(toNano('100')) * Math.random())),
-                $$type: 'OneTask',
-                finished: false,
-            });
-        }
-
-        const deployResult = await lockContract.send(
-            investor.getSender(),
-            {
-                value: toNano('0.05'),
-            },
-            {
-                $$type: 'InitializeContract',
-                subtasksIT: {
-                    $$type: 'Subtasks',
-                    token: await tokenMaster.getGetWalletAddress(lockContract.address),
-                    finishAmount: amountAfterFinish,
-                    tasks,
-                },
-            },
-        );
-
-        expect(deployResult.transactions).toHaveTransaction({
-            from: investor.address,
-            to: lockContract.address,
-            deploy: true,
-            success: true,
-        });
-
-        const { transactions } = await investorToken.send(
-            investor.getSender(),
-            {
-                value: toNano('1.05'),
-            },
-            {
-                $$type: 'TokenTransfer',
-                amount: totalTokens(),
-                queryId: 0n,
-                destination: lockContract.address,
-                response_destination: investor.address,
-                custom_payload: null,
-                forward_ton_amount: 1n,
-                forward_payload: beginCell()
-                    .storeUint(0, 32)
-                    .storeStringTail('Send funds for lock')
-                    .endCell()
-                    .asSlice(),
-            },
-        );
     });
 
     it('should deploy', async () => {
         const { balance } = await lockToken.getGetWalletData();
         expect(balance).toBe(totalTokens());
         const data = await lockContract.getData();
-        expect(beginCell().store(storeSubtasks(data.subtasks)).endCell()).toEqualCell(
-            beginCell()
-                .store(
-                    storeSubtasks({
-                        $$type: 'Subtasks',
-                        tasks,
-                        finishAmount: amountAfterFinish,
-                        token: await tokenMaster.getGetWalletAddress(lockContract.address),
-                    }),
-                )
-                .endCell(),
-        );
+        expect(data.subtasks.tasks.keys().join(',')).toEqual(tasks.keys().join(','));
+        expect(data.subtasks.finishAmount).toBe(amountAfterFinish);
+        expect(data.subtasks.token).toEqualAddress(await tokenMaster.getGetWalletAddress(lockContract.address));
+
         expect(data.investor).toEqualAddress(investor.address);
         expect(data.performer).toEqualAddress(performer.address);
         expect(data.moderator).toEqualAddress(moderator.address);
@@ -151,6 +172,7 @@ describe('TonInvestor', () => {
         expect(data.argueFromInvestor).toBe(false);
         expect(data.canceled).toBe(false);
         expect(data.started).toBe(false);
+
     });
     it('should start', async () => {
         await lockContract.send(
@@ -176,7 +198,7 @@ describe('TonInvestor', () => {
     });
     it('investor should cancel', async () => {
         const startBalance = await investorToken.getGetWalletData().then((e) => e.balance);
-        const {transactions} = await lockContract.send(
+        const { transactions } = await lockContract.send(
             investor.getSender(),
             {
                 value: toNano('0.18'),
@@ -242,7 +264,7 @@ describe('TonInvestor', () => {
             const isLastTask = await lockContract
                 .getData()
                 .then((e) => e.subtasks.tasks.values().filter((e) => !e.finished).length === 1);
-            const {transactions} = await lockContract.send(
+            const { transactions } = await lockContract.send(
                 investor.getSender(),
                 {
                     value: toNano('0.25'),
@@ -290,7 +312,7 @@ describe('TonInvestor', () => {
         const performerBalanceNow = await performerToken.getGetWalletData().then((e) => e.balance);
         expect(performerBalanceNow).toBe(performerBalance + tasks.get(6)!.amount - interest(tasks.get(6)!.amount));
         const investorBalance = await investorToken.getGetWalletData().then((e) => e.balance);
-        const {transactions} = await lockContract.send(
+        const { transactions } = await lockContract.send(
             moderator.getSender(),
             {
                 value: toNano('0.19'),
@@ -309,5 +331,4 @@ describe('TonInvestor', () => {
         );
         expect(data.canceled).toBe(true);
     });
-
 });

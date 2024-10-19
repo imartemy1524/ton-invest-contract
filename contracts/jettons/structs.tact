@@ -10,88 +10,10 @@ const NoJetton: Int = 0x1001;
 
 
 
-struct Loan {
-    //Neede Amount
-    wantAmount: Int as uint64;
-    //Loan duration in days
-    days: Int as uint8;
-    //In tons
-    dayInterest: Int as uint64;
-    jetton: Address?;
-}
-//message NewLoan {
-//    senderAddress: Address;
-//    op: Int as uint32;
-//    queryId: Int as uint64;
-//    prevOwnerAddress: Address;
-//
-//    forwardPayload: Loan as remaining;
-//
-//}
 
 
-message(0x1284273) InitLoan {
-    //    queryId: Int as uint64;
-    loan: Loan;
-    nftAddress: Address;
-    owner: Address;
-}
 
-message(0x8122548) StartMsg{}
-message(0x9dad60b2) Offer {
-    offerLoan: Loan;
-}
-struct OfferLoan{
-    offer: Loan;
-    owner: Address;
-}
-message(0x12925382) WithdrawNFTNotRepayed{}
-message(0x12915486) CancelLoan{}
-message(0x21472373) RedeemMessage{}
-message(0x3c576c66) CancelOffer{
-    offerIndex: Int;
-}
-message(0x6cd2612c) StartOfferIndex{
-    offerIndex: Int;
-}
-struct ForwardNftPayload{
-    loan: Loan;
-}
 
-message(0x28361849) SetAcceptableJettons{
-    jettons: map<Address,Address>;
-}
-message(0x05138d91) OwnershipAssignedMaster {
-    queryId: Int as uint64;
-    prevOwner: Address;
-    bite: Bool;
-    //REQUIRED to pass loan as payload!!!
-    payload: Slice as remaining;
-}
-message(0x19274626) TransferNftToLoan {
-    nft: Address;
-    excessTo: Address;
-    myId: Int as uint64;
-}
-message(0x05138d91) OwnershipAssigned {
-    queryId: Int as uint64;
-    prevOwner: Address;
-    forwardPayload: Slice as remaining;
-}
-message(0x19487234) WithdrawlToken{
-    amount: Int as coins;
-    myJetton: Address?;
-}
-message(0x5fcc3d14) TransferNFT {
-    queryId: Int as uint64;
-    newOwner: Address;
-    responseDestination: Address;
-    customPayload: Bool;
-
-    forwardAmount: Int as coins;
-    hasPayload: Bool;
-    forwardPayload: Slice as remaining;
-}
 message(0xd53276db) ExcessMsg{}
 message(0xf8a7ea5) TokenTransfer {
     queryId: Int as uint64;
@@ -101,22 +23,6 @@ message(0xf8a7ea5) TokenTransfer {
     custom_payload: Cell?;
     forward_ton_amount: Int as coins;
     forward_payload: Slice as remaining; // Comment Text message when Transfer the jetton
-}
-
-struct LoanData{
-    nft: Address?;
-    owner: Address;
-    stopped: Bool;
-    parent: Address;
-    started: Bool;
-    loanIssuer: Address?;
-    activeLoan: Loan;
-    // Return the index of the master contract. With it one can easily verify, that this contract really belongs to the master (call master getContract).
-    masterIndex: Int as uint64;
-    startTime: Int as uint64;
-    accuredInterest: Int as uint64;
-    merchantInterest: Int as uint64;
-    acceptJettons: map<Address, Address>;
 }
 
 //extends fun toInt(self: String, skip: Int): Int {

@@ -1,5 +1,5 @@
 import { Address, toNano } from '@ton/core';
-import { TonInvestor } from '../wrappers/TonInvestor';
+import { TonInvestor } from '../wrappers/TonGuarantee';
 import { NetworkProvider, sleep } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider, args: string[]) {

@@ -3,36 +3,8 @@ import "./roles.tact";
 import "./arguable.tact";
 import "./startable.tact";
 import "./jettons_sender.tact";
-struct OneTask{
-    amount: Int as coins;
-    finished: Bool = false;
-}
-struct Subtasks{
-    token: Address;
-    // amount that would be send to performer after all tasks are finished
-    finishAmount: Int as coins;
-    tasks: map<Int as uint16, OneTask>;
-}
-message InitializeContract{
-    subtasksIT: Subtasks;
-}
-message ReleaseSubtask{
-    taskId: Int;
-    isLastTask: Bool;
-}
-const NullAddress: Address = address("UQD__________________________________________xYt");
-
-struct InvestmentData{
-    investor: Address;
-    performer: Address;
-    moderator: Address;
-    subtasks: Subtasks;
-    argueFromInvestor: Bool;
-    argueFromWorker: Bool;
-    started: Bool;
-    canceled: Bool;
-}
-contract TonInvestor with Moderable, Startable, JettonsSender {
+import "./structs.tact";
+contract TonGuarantee with Moderable, Startable, JettonsSender {
     override const storageReserve: Int = ton("0.01");
     argueFromInvestor: Bool = false;
     argueFromWorker: Bool = false;
@@ -44,23 +16,38 @@ contract TonInvestor with Moderable, Startable, JettonsSender {
     moderator: Address;
     subtasks: Subtasks;
 
-    init(investor: Address, performer: Address, moderator: Address) {
-        self.investor = investor;
-        self.performer = performer;
-        self.moderator = moderator;
+    collection: Address;
+    index: Int;
+
+    init(collection: Address, index: Int) {
+        self.collection = collection;
+        self.index = index;
         self.subtasks = Subtasks{ token: NullAddress, tasks: emptyMap(), finishAmount: 0};
+        self.investor = NullAddress;
+        self.performer = NullAddress;
+        self.moderator = NullAddress;
     }
 
     //message to initialize contract
     receive(m: InitializeContract){
-        self.requireNotStarted();
-        require(self.subtasks.token == NullAddress, "Already initialized");
-        self.requireInvestor();
-        self.subtasks = m.subtasksIT;
-        foreach(key, task in self.subtasks.tasks){
-            require(!task.finished, "Can not initialize contract with finished tasks");
+        require(sender() == self.collection, "Only collection can initialize contract");
+        try{
+            self.requireNotStarted();
+            require(self.investor == NullAddress, "Already initialized");
+            require(self.performer == NullAddress, "Already initialized");
+            require(self.moderator == NullAddress, "Already initialized");
+            self.subtasks = m.subtasks;
+            self.investor = m.investor;
+            self.performer = m.performer;
+            self.moderator = m.moderator;
+            foreach(key, task in self.subtasks.tasks){
+                require(!task.finished, "Can not initialize contract with finished tasks");
+            }
+            self.forward(m.investor, "ok".asComment(), false, null);
+        } catch(e){
+            throw(e);
+            //TODO: what if error???
         }
-        self.reply("deployed".asComment());
     }
 
 
@@ -105,15 +92,20 @@ contract TonInvestor with Moderable, Startable, JettonsSender {
     }
 
     get fun data(): InvestmentData{
+        return self._data();
+    }
+
+    fun _data(): InvestmentData{
         return InvestmentData{
+            subtasks: self.subtasks,
             investor: self.investor,
             performer: self.performer,
             moderator: self.moderator,
-            subtasks: self.subtasks,
             argueFromInvestor: self.argueFromInvestor,
             argueFromWorker: self.argueFromWorker,
             started: self.started,
-            canceled: self.canceled
+            canceled: self.canceled,
+            index: self.index
         };
     }
 }

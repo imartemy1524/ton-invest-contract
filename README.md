@@ -1,10 +1,10 @@
-# Ton Investments smart contract
+# Ton guarantee smart contract
 
-This is a smart contract for investments in TON.
+This is a smart contract for doing some work with 3rd-party guarantee in case of conflicts.
 
 ### How does it work:
 
-There is 3 parties in the contract: investor, performer and moderator. Investor invests money, performer performs the work and moderator resolves conflicts.
+There are 3 parties in the contract: investor, performer and moderator. Investor invests money, performer performs the work and moderator resolves conflicts.
 
 #### Investment process:
 1. Investor creates the smart contract, and "locks" jettons (for example, USDT) in it.
