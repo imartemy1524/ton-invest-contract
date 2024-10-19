@@ -43,8 +43,7 @@ describe('TonInvestor', () => {
     let tasks: Dictionary<number, OneTask>;
     const amountAfterFinish: bigint = toNano('1000');
 
-    const totalTokens = () =>
-        tasks
+    const totalTokens = () => tasks
             .values()
             .map((e) => e.amount)
             .reduce((a, b) => a + b, 0n) + amountAfterFinish;
@@ -169,7 +168,7 @@ describe('TonInvestor', () => {
         );
         const data = await lockContract.getData();
         expect(data.started).toBe(false);
-    })
+    });
     it('investor should cancel', async () => {
         const startBalance = await investorToken.getGetWalletData().then((e) => e.balance);
         await lockContract.send(
@@ -183,7 +182,119 @@ describe('TonInvestor', () => {
         expect(data.canceled).toBe(true);
         expect(await investorToken.getGetWalletData().then((e) => e.balance)).toBe(startBalance + totalTokens());
     });
-    it('performer should complete tasks', async ()=>{
+    it('performer should complete tasks', async () => {
+        await lockContract.send(
+            performer.getSender(),
+            {
+                value: toNano('0.1'),
+            },
+            'start',
+        );
+        let performerBalance = 0n;
+        for (const taskId of tasks.keys()) {
+            const isLastTask = await lockContract
+                .getData()
+                .then((e) => e.subtasks.tasks.values().filter((e) => !e.finished).length === 1);
+            await lockContract.send(
+                investor.getSender(),
+                {
+                    value: toNano('0.19'),
+                },
+                {
+                    $$type: 'ReleaseSubtask',
+                    taskId: BigInt(taskId),
+                    isLastTask,
+                },
+            );
+            performerBalance += tasks.get(taskId)!.amount;
+            if (isLastTask) {
+                performerBalance += amountAfterFinish;
+            }
+            const performerBalanceNow = await performerToken.getGetWalletData().then((e) => e.balance);
+            expect(performerBalanceNow).toBe(performerBalance);
+        }
+    });
 
-    } )
+    it('should argue', async () => {
+        await lockContract.send(
+            performer.getSender(),
+            {
+                value: toNano('0.1'),
+            },
+            'start',
+        );
+        let performerBalance = 0n;
+        const keys = tasks.keys();
+        for (let i = 0; i < 5; i++) {
+            const taskId = keys[i];
+            const isLastTask = await lockContract
+                .getData()
+                .then((e) => e.subtasks.tasks.values().filter((e) => !e.finished).length === 1);
+            await lockContract.send(
+                investor.getSender(),
+                {
+                    value: toNano('0.19'),
+                },
+                {
+                    $$type: 'ReleaseSubtask',
+                    taskId: BigInt(taskId),
+                    isLastTask: false,
+                },
+            );
+            performerBalance += tasks.get(taskId)!.amount;
+            if (isLastTask) {
+                performerBalance += amountAfterFinish;
+            }
+            const performerBalanceNow = await performerToken.getGetWalletData().then((e) => e.balance);
+            expect(performerBalanceNow).toBe(performerBalance);
+        }
+        //argue
+
+        await lockContract.send(
+            investor.getSender(),
+            {
+                value: toNano('0.19'),
+            },
+            {
+                $$type: 'SetArgue',
+                argue: true,
+            },
+        );
+        let data = await lockContract.getData();
+        expect(data.argueFromInvestor).toBe(true);
+        expect(data.argueFromWorker).toBe(false);
+        await lockContract.send(
+            moderator.getSender(),
+            {
+                value: toNano('0.19'),
+            },
+            {
+                $$type: 'ModeratorCloseTask',
+                taskId: BigInt(6),
+                isLastTask: false,
+            },
+        );
+        const performerBalanceNow = await performerToken.getGetWalletData().then((e) => e.balance);
+        expect(performerBalanceNow).toBe(performerBalance + tasks.get(6)!.amount);
+        const investorBalance = await investorToken.getGetWalletData().then((e) => e.balance);
+        const {transactions} = await lockContract.send(
+            moderator.getSender(),
+            {
+                value: toNano('0.19'),
+            },
+            'moderator_cancel',
+        );
+        data = await lockContract.getData();
+        const investorReturnBalance =
+            data.subtasks.tasks
+                .values()
+                .filter((e) => !e.finished)
+                .map((e) => e.amount)
+                .reduce((a, b) => a + b, 0n) + data.subtasks.finishAmount;
+        expect(await investorToken.getGetWalletData().then((e) => e.balance)).toBe(
+            investorBalance + investorReturnBalance,
+        );
+        expect(data.canceled).toBe(true);
+    });
+
 });

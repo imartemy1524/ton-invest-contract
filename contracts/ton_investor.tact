@@ -18,6 +18,7 @@ message IntializeContract{
 }
 message ReleaseSubtask{
     taskId: Int;
+    isLastTask: Bool;
 }
 const NullAddress: Address = address("UQD__________________________________________xYt");
 
@@ -68,7 +69,7 @@ contract TonInvestor with Moderable, Startable, JettonsSender {
         self.requireInvestor();
         self.requireStarted();
         self.requireNotCanceled();
-        self.closeTask(m.taskId);
+        self.closeTask(m.taskId, m.isLastTask);
     }
 
     //cancel the contract by performer
@@ -86,14 +87,21 @@ contract TonInvestor with Moderable, Startable, JettonsSender {
         self.sendJettonsTo(self.investor, self.restValue(), sender());
     }
 
-    override fun closeTask(taskId: Int){
+    override fun closeTask(taskId: Int, isLastTask: Bool){
         self.requireSendFee();
         let task = self.subtasks.tasks.get(taskId);
         require(task != null && !task!!.finished, "Task is not found or already finished");
         let taskNotNull = task!!;
         taskNotNull.finished = true;
         self.subtasks.tasks.set(taskId, taskNotNull);
-        self.sendJettonsTo(self.performer, taskNotNull.amount, sender());
+        let amount = taskNotNull.amount;
+        if(isLastTask){
+            foreach(_, taskIT in self.subtasks.tasks){
+                require(taskIT.finished, "Not all tasks are finished");
+            }
+            amount += self.subtasks.finishAmount;
+        }
+        self.sendJettonsTo(self.performer, amount, sender());
     }
 
     get fun data(): InvestmentData{

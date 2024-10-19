@@ -1,5 +1,6 @@
 message ModeratorCloseTask{
     taskId: Int as uint64;
+    isLastTask: Bool;
 }
 
 
@@ -39,14 +40,14 @@ trait Moderable with Investable, Performable, Arguable {
 
     receive(m: ModeratorCloseTask){
         self.requireModerator();
-        self.closeTask(m.taskId);
+        self.closeTask(m.taskId, m.isLastTask);
     }
     receive("moderator_cancel"){
         self.requireModerator();
         self.releaseFundsToInvestor();
     }
     abstract fun releaseFundsToInvestor();
-    abstract fun closeTask(taskId: Int);
+    abstract fun closeTask(taskId: Int, isLastTask: Bool);
 }
 
 
