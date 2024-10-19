@@ -26,6 +26,7 @@ async function deployJetton(blockchain: Blockchain, owner: SandboxContract<Treas
     return jettonMaster;
 }
 
+const interest = (oldAmount: bigint) =>oldAmount/ 50n;
 describe('TonInvestor', () => {
     let blockchain: Blockchain;
     //users
@@ -39,6 +40,7 @@ describe('TonInvestor', () => {
     let lockToken: SandboxContract<JettonChild>;
     let investorToken: SandboxContract<JettonChild>;
     let performerToken: SandboxContract<JettonChild>;
+    let moderatorToken: SandboxContract<JettonChild>;
     //tasks
     let tasks: Dictionary<number, OneTask>;
     const amountAfterFinish: bigint = toNano('1000');
@@ -64,6 +66,9 @@ describe('TonInvestor', () => {
         );
         performerToken = blockchain.openContract(
             JettonChild.fromAddress(await tokenMaster.getGetWalletAddress(performer.address)),
+        );
+        moderatorToken = blockchain.openContract(
+            JettonChild.fromAddress(await tokenMaster.getGetWalletAddress(moderator.address)),
         );
         lockToken = blockchain.openContract(
             JettonChild.fromAddress(await tokenMaster.getGetWalletAddress(lockContract.address)),
@@ -171,13 +176,14 @@ describe('TonInvestor', () => {
     });
     it('investor should cancel', async () => {
         const startBalance = await investorToken.getGetWalletData().then((e) => e.balance);
-        await lockContract.send(
+        const {transactions} = await lockContract.send(
             investor.getSender(),
             {
-                value: toNano('0.15'),
+                value: toNano('0.18'),
             },
             'cancel',
         );
+        printTransactionFees(transactions);
         const data = await lockContract.getData();
         expect(data.canceled).toBe(true);
         expect(await investorToken.getGetWalletData().then((e) => e.balance)).toBe(startBalance + totalTokens());
@@ -191,6 +197,7 @@ describe('TonInvestor', () => {
             'start',
         );
         let performerBalance = 0n;
+        let interestBalance = 0n;
         for (const taskId of tasks.keys()) {
             const isLastTask = await lockContract
                 .getData()
@@ -198,7 +205,7 @@ describe('TonInvestor', () => {
             await lockContract.send(
                 investor.getSender(),
                 {
-                    value: toNano('0.19'),
+                    value: toNano('0.3'),
                 },
                 {
                     $$type: 'ReleaseSubtask',
@@ -206,12 +213,17 @@ describe('TonInvestor', () => {
                     isLastTask,
                 },
             );
-            performerBalance += tasks.get(taskId)!.amount;
+            const amount = tasks.get(taskId)!.amount;
+            interestBalance += interest(amount);
+            performerBalance += amount - interest(amount);
             if (isLastTask) {
-                performerBalance += amountAfterFinish;
+                performerBalance += amountAfterFinish - interest(amountAfterFinish);
+                interestBalance += interest(amountAfterFinish);
             }
             const performerBalanceNow = await performerToken.getGetWalletData().then((e) => e.balance);
             expect(performerBalanceNow).toBe(performerBalance);
+            const interestBalanceNow = await moderatorToken.getGetWalletData().then((e) => e.balance);
+            expect(interestBalanceNow).toBe(interestBalance);
         }
     });
 
@@ -230,10 +242,10 @@ describe('TonInvestor', () => {
             const isLastTask = await lockContract
                 .getData()
                 .then((e) => e.subtasks.tasks.values().filter((e) => !e.finished).length === 1);
-            await lockContract.send(
+            const {transactions} = await lockContract.send(
                 investor.getSender(),
                 {
-                    value: toNano('0.19'),
+                    value: toNano('0.25'),
                 },
                 {
                     $$type: 'ReleaseSubtask',
@@ -241,9 +253,10 @@ describe('TonInvestor', () => {
                     isLastTask: false,
                 },
             );
-            performerBalance += tasks.get(taskId)!.amount;
+            let am = tasks.get(taskId)!.amount;
+            performerBalance += am - interest(am);
             if (isLastTask) {
-                performerBalance += amountAfterFinish;
+                performerBalance += amountAfterFinish - interest(amountAfterFinish);
             }
             const performerBalanceNow = await performerToken.getGetWalletData().then((e) => e.balance);
             expect(performerBalanceNow).toBe(performerBalance);
@@ -266,7 +279,7 @@ describe('TonInvestor', () => {
         await lockContract.send(
             moderator.getSender(),
             {
-                value: toNano('0.19'),
+                value: toNano('0.27'),
             },
             {
                 $$type: 'ModeratorCloseTask',
@@ -275,7 +288,7 @@ describe('TonInvestor', () => {
             },
         );
         const performerBalanceNow = await performerToken.getGetWalletData().then((e) => e.balance);
-        expect(performerBalanceNow).toBe(performerBalance + tasks.get(6)!.amount);
+        expect(performerBalanceNow).toBe(performerBalance + tasks.get(6)!.amount - interest(tasks.get(6)!.amount));
         const investorBalance = await investorToken.getGetWalletData().then((e) => e.balance);
         const {transactions} = await lockContract.send(
             moderator.getSender(),

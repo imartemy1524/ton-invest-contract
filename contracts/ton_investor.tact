@@ -74,7 +74,7 @@ contract TonInvestor with Moderable, Startable, JettonsSender {
 
     //cancel the contract by performer
     receive("cancel_performer"){
-        self.requireSendFee();
+        self.requireSendFee(false);
         self.requirePerformer();
         self.requireNotCanceled();
 
@@ -83,12 +83,12 @@ contract TonInvestor with Moderable, Startable, JettonsSender {
 
     override fun releaseFundsToInvestor(){
         self.canceled = true;
-        self.requireSendFee();
-        self.sendJettonsTo(self.investor, self.restValue(), sender());
+        self.requireSendFee(false);
+        self.sendJettonsTo(self.investor, self.restValue(), sender(), false);
     }
 
     override fun closeTask(taskId: Int, isLastTask: Bool){
-        self.requireSendFee();
+        self.requireSendFee(true);
         let task = self.subtasks.tasks.get(taskId);
         require(task != null && !task!!.finished, "Task is not found or already finished");
         let taskNotNull = task!!;
@@ -101,7 +101,7 @@ contract TonInvestor with Moderable, Startable, JettonsSender {
             }
             amount += self.subtasks.finishAmount;
         }
-        self.sendJettonsTo(self.performer, amount, sender());
+        self.sendJettonsTo(self.performer, amount, sender(), true);
     }
 
     get fun data(): InvestmentData{
