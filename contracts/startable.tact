@@ -2,9 +2,9 @@
 
 trait Startable with Performable, Investable{
     started: Bool;
-    canceled: Bool;
     investor: Address;
     performer: Address;
+    revokedAt: Int;
 
     //start the contract
     receive("start"){
@@ -20,13 +20,13 @@ trait Startable with Performable, Investable{
         self.requireNotCanceled();
         self.releaseFundsToInvestor();
     }
-    abstract fun releaseFundsToInvestor();
+    virtual fun releaseFundsToInvestor(){}
 
     inline fun requireNotCanceled(){
-        require(!self.canceled, "Contract is canceled");
+        require(self.revokedAt == 0, "Contract is canceled");
     }
     inline fun requireCanceled(){
-        require(self.canceled, "Contract is not canceled");
+        require(self.revokedAt != 0, "Contract is not canceled");
     }
 
 

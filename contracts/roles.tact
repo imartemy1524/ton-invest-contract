@@ -46,7 +46,7 @@ trait Moderable with Investable, Performable, Arguable {
         self.requireModerator();
         self.releaseFundsToInvestor();
     }
-    abstract fun releaseFundsToInvestor();
+    virtual fun releaseFundsToInvestor(){}
     abstract fun closeTask(taskId: Int, isLastTask: Bool);
 }
 

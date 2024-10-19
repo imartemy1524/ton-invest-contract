@@ -4,12 +4,13 @@ import "./arguable.tact";
 import "./startable.tact";
 import "./jettons_sender.tact";
 import "./structs.tact";
-contract TonGuarantee with Moderable, Startable, JettonsSender {
+import "./ton_guarantee_sbt.tact";
+contract TonGuarantee with Moderable, Startable, JettonsSender, TonGuaranteeSbt {
     override const storageReserve: Int = ton("0.01");
     argueFromInvestor: Bool = false;
     argueFromWorker: Bool = false;
     started: Bool = false;
-    canceled: Bool = false;
+    revokedAt: Int as uint64 = 0;
 
     investor: Address;
     performer: Address;
@@ -69,7 +70,7 @@ contract TonGuarantee with Moderable, Startable, JettonsSender {
     }
 
     override fun releaseFundsToInvestor(){
-        self.canceled = true;
+        self.revokedAt = now();
         self.requireSendFee(false);
         self.sendJettonsTo(self.investor, self.restValue(), sender(), false);
     }
@@ -91,6 +92,13 @@ contract TonGuarantee with Moderable, Startable, JettonsSender {
         self.sendJettonsTo(self.performer, amount, sender(), true);
     }
 
+    override fun isNftInitialized(): Bool{
+        return self.investor != NullAddress;
+    }
+    override fun getData(): Cell{
+        return self._data().toCell();
+    }
+
     get fun data(): InvestmentData{
         return self._data();
     }
@@ -104,10 +112,12 @@ contract TonGuarantee with Moderable, Startable, JettonsSender {
             argueFromInvestor: self.argueFromInvestor,
             argueFromWorker: self.argueFromWorker,
             started: self.started,
-            canceled: self.canceled,
+            canceled: self.revokedAt != 0,
             index: self.index
         };
     }
+
+
 }
 
 
