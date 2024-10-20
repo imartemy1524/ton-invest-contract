@@ -61,8 +61,7 @@ describe('TonInvestor', () => {
     let tasks: Dictionary<number, OneTask> = Dictionary.empty();
     const amountAfterFinish: bigint = toNano('1000');
 
-    const totalTokens = () =>
-        tasks
+    const totalTokens = () => tasks
             .values()
             .map((e) => e.amount)
             .reduce((a, b) => a + b, 0n) + amountAfterFinish;

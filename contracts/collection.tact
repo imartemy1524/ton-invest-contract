@@ -9,11 +9,15 @@ extends inline fun buildNftName(self: InvestmentData, index: Int): String {
 }
 extends inline fun buildDescription(self: InvestmentData, index: Int): String {
     let count = 0;
+    let done = 0;
     foreach(a, b in self.subtasks.tasks){
         count += 1;
+        if(b.finished){
+            done += 1;
+        }
     }
     let builderDescription = beginString()
-        .concat("Investment for work contained ").concat(count.toString()).concat(" subtasks, which is done by ")
+        .concat("Investment for work with ").concat(count.toString()).concat(" subtasks (").concat(done.toString()).concat(" done)").concat(", which is done by ")
         .concat(self.performer.toString())
         .concat(" with 3rd-party moderation by ")
         .concat(self.moderator.toString())
@@ -30,7 +34,7 @@ extends inline fun buildAttributesString(self: InvestmentData): String {
     return builderAttributes.toString();
 }
 inline extends fun buildImage(self: InvestmentData): ElString {
-    return ElString{ value: ""};
+    return ElString{ value: "https://storage.ronin.co/spa_zbhtcy3dmbx5jzgg/30793843-1ff2-45c4-9c65-f211d674c959"};
 }
 //Store nft text as snake cell
 inline fun nftTextToCellAsMultiref(input: String): Cell {
@@ -65,7 +69,7 @@ trait SbtCollection{
     abstract const CollectionDescription: String;
     abstract const LogoURL: String;
 
-        get fun get_collection_data(): CollectionData {
+    get fun get_collection_data(): CollectionData {
         let data: map<Int, ElString> = emptyMap();
         data.set(sha256("name"), ElString{ value: self.CollectionName});
         data.set(sha256("description"), ElString{ value: self.CollectionDescription});
@@ -119,7 +123,7 @@ struct RandomHasher{
 contract Collection with SbtCollection{
     override const CollectionName: String = "Investments SBTs";
     override const CollectionDescription: String = "Collection of SBT-based investments. Each NFT represents a single investment";
-    override const LogoURL: String = "";
+    override const LogoURL: String = "https://storage.ronin.co/spa_zbhtcy3dmbx5jzgg/30793843-1ff2-45c4-9c65-f211d674c959";
     override const storageReserve: Int = ton("0.02");
 
     override inline fun at(id: Int): Address{
